@@ -150,6 +150,11 @@ const AuthContextProvider = ({ children }) => {
       }
 
       setToken(normalizedToken);
+      try {
+        localStorage.setItem('token', normalizedToken);
+      } catch (error) {
+        console.warn('Unable to persist auth token:', error);
+      }
 
       if (profileData) {
         updateProfile(profileData);
