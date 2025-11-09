@@ -150,7 +150,7 @@ const GameTabsLg = () => {
         </button>
 
         {/* Pone Wine Game Tab */}
-        <button
+       {/* <button
           className={`relative flex flex-col items-center justify-center min-w-[68px] p-1 rounded-2xl transition-all duration-300 shadow-lg bg-gradient-to-br border-2 border-transparent group snap-center active:scale-95 focus:outline-none focus:ring-2 focus:ring-yellow-400 select-none
             ${
               type === "ponewine"
@@ -177,7 +177,7 @@ const GameTabsLg = () => {
   background: 'linear-gradient(to right, #63a3ff, #b6deff)'}}>
             PoneWine
           </span>
-        </button>
+        </button> */}
 
          {/* Dynamic Game Type Tabs */}
         {gameTabs &&
@@ -218,7 +218,7 @@ const GameTabsLg = () => {
 
        
          {/* Shan Game Tab */}
-        <button
+       {/* <button
           className={`relative flex flex-col items-center justify-center min-w-[68px] p-1 rounded-2xl transition-all duration-300 shadow-lg bg-gradient-to-br border-2 border-transparent group snap-center active:scale-95 focus:outline-none focus:ring-2 focus:ring-yellow-400 select-none
             ${
               type === "digitbet"
@@ -245,7 +245,7 @@ const GameTabsLg = () => {
   background: 'linear-gradient(to right, #63a3ff, #b6deff)'}}>
             ShanKoMe
           </span>
-        </button>
+        </button> */}
         {/* 2D Tab */}
         {/* <button
           className={`relative flex flex-col items-center justify-center min-w-[68px] p-1 rounded-2xl transition-all duration-300 shadow-lg bg-gradient-to-br border-2 border-transparent group snap-center active:scale-95 focus:outline-none focus:ring-2 focus:ring-yellow-400 select-none
@@ -371,7 +371,7 @@ const GameTabsLg = () => {
         <button
           className={`cursor-pointer group flex flex-col items-center`
         }
-          // style={{boxShadow: '0 2px 12px 0 rgba(0,0,0,0.14)'}}
+          
           onClick={() => navigate("/buffalo")}
         >
           <div className="relative w-full aspect-square overflow-hidden  p-1  group-hover:shadow-2xl transition-all duration-200"
@@ -395,7 +395,7 @@ const GameTabsLg = () => {
          
 
             {/* Pone Wine Game Tab */}
-            <button
+          {/*  <button
               className={`cursor-pointer group flex flex-col items-center
  
   `}
@@ -418,10 +418,10 @@ const GameTabsLg = () => {
   background: 'linear-gradient(to right, #63a3ff, #b6deff)'}}>
                 PoneWine
               </span>
-            </button>
+            </button> */}
 
                     {/* Shan Game Tab */}
-            <button
+             {/* <button
               className={`cursor-pointer group flex flex-col items-center`}
               onClick={() => navigate("/shan")}
             >
@@ -441,7 +441,7 @@ const GameTabsLg = () => {
   background: 'linear-gradient(to right, #63a3ff, #b6deff)'}}>
                 ShanKoMe
               </span>
-            </button>
+            </button> */}
               
               {/* 2D  */}
               {/* <button
