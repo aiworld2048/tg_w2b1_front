@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import BASE_URL from './baseUrl';
 import { message } from 'antd';
+import { AuthContext } from '../contexts/AuthContext';
 
 const useRegister = () => {
     const [error, setError] = useState();
     const [errMsg, setErrMsg] = useState();
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { authenticate } = useContext(AuthContext);
 
     const register = async (url, inputData) => {
         setLoading(true);
@@ -17,11 +18,11 @@ const useRegister = () => {
             if (res.status === 200) {
                 setError();
                 setLoading(false);
-                localStorage.setItem('token', res.data.data.token);
-                window.location.reload();
+                const { token, user } = res.data.data ?? {};
+                await authenticate(token, user, { skipProfileFetch: true });
                 navigate('/?type=all');
                 message.success('Registerd Successfully.');
-                return res.data.data.user;
+                return user;
             }
         } catch (e) {
             setLoading(false);

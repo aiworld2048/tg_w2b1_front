@@ -21,9 +21,32 @@ const AuthContext = createContext({
 
 const POLLING_INTERVAL = 15000;
 
+const normalizeToken = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.startsWith('Bearer ') ? trimmed.slice(7) : trimmed;
+};
+
+const readStoredToken = () => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const stored = window.localStorage.getItem('token');
+  const normalized = normalizeToken(stored);
+  if (normalized && stored !== normalized) {
+    window.localStorage.setItem('token', normalized);
+  }
+  return normalized;
+};
+
 const AuthContextProvider = ({ children }) => {
   const navigate = useNavigate();
-  const [token, setToken] = useState(() => localStorage.getItem('token'));
+  const [token, setToken] = useState(readStoredToken);
   const [profile, setProfile] = useState(() => {
     const savedProfile = localStorage.getItem('userProfile');
     return savedProfile ? JSON.parse(savedProfile) : null;
@@ -120,17 +143,18 @@ const AuthContextProvider = ({ children }) => {
 
   const authenticate = useCallback(
     async (nextToken, profileData, options = {}) => {
-      if (!nextToken) {
+      const normalizedToken = normalizeToken(nextToken);
+      if (!normalizedToken) {
         logout();
         return;
       }
 
-      setToken(nextToken);
+      setToken(normalizedToken);
 
       if (profileData) {
         updateProfile(profileData);
       } else if (!options.skipProfileFetch) {
-        await refreshProfile(nextToken);
+        await refreshProfile(normalizedToken);
       }
     },
     [logout, refreshProfile, updateProfile]

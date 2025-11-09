@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -10,8 +9,19 @@ import { AuthContext } from '../contexts/AuthContext';
 
 const EMPTY_OBJECT = {};
 
+const formatAuthorizationHeader = (token) => {
+  if (typeof token !== 'string') {
+    return undefined;
+  }
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return trimmed.startsWith('Bearer ') ? trimmed : `Bearer ${trimmed}`;
+};
+
 const useFetch = (url, options = {}) => {
-  const { auth, logout } = useContext(AuthContext);
+  const { auth } = useContext(AuthContext);
 
   const {
     method = 'GET',
@@ -41,14 +51,6 @@ const useFetch = (url, options = {}) => {
     transformRef.current = transformResponse;
   }, [transformResponse]);
 
-  const defaultUnauthorizedHandler = useCallback(() => {
-    if (logout) {
-      logout();
-    }
-  }, [logout]);
-
-  const unauthorizedHandler = onUnauthorized || defaultUnauthorizedHandler;
-
   const headersKey = useMemo(
     () => (headersOption ? JSON.stringify(headersOption) : ''),
     [headersOption]
@@ -69,8 +71,11 @@ const useFetch = (url, options = {}) => {
       resolvedHeaders['Content-Type'] = 'application/json';
     }
 
-    if (requiresAuth && auth && !resolvedHeaders.Authorization) {
-      resolvedHeaders.Authorization = `Bearer ${auth}`;
+    if (requiresAuth && !resolvedHeaders.Authorization) {
+      const authHeaderValue = formatAuthorizationHeader(auth);
+      if (authHeaderValue) {
+        resolvedHeaders.Authorization = authHeaderValue;
+      }
     }
 
     return resolvedHeaders;
@@ -97,7 +102,7 @@ const useFetch = (url, options = {}) => {
         });
 
         if (response.status === 401) {
-          unauthorizedHandler?.();
+          onUnauthorized?.();
           setError('Unauthorized');
           setLoading(false);
           return;
@@ -128,14 +133,7 @@ const useFetch = (url, options = {}) => {
     return () => {
       abortController.abort();
     };
-  }, [
-    url,
-    method,
-    body,
-    memoizedHeaders,
-    unauthorizedHandler,
-    skip,
-  ]);
+  }, [url, method, body, memoizedHeaders, onUnauthorized, skip]);
 
   return { data, loading, error };
 };
