@@ -1,69 +1,143 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { AuthContext } from '../contexts/AuthContext';
 
-const useFetch = (url) => {
-    let [data, setData] = useState([]);
-    let [loading, setLoading] = useState(false);
-    let [error, setError] = useState(null);
-    let navigate = useNavigate();
+const EMPTY_OBJECT = {};
 
-    useEffect(() => {
-        // Don't fetch if URL is null or undefined
-        if (!url) {
-            setLoading(false);
-            return;
+const useFetch = (url, options = {}) => {
+  const { auth, logout } = useContext(AuthContext);
+
+  const {
+    method = 'GET',
+    headers: headersOption,
+    body,
+    requiresAuth = true,
+    transformResponse,
+    onUnauthorized,
+    skip = false,
+    initialData,
+  } = options || {};
+
+  const [data, setData] = useState(
+    initialData !== undefined ? initialData : []
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const transformRef = useRef(transformResponse);
+
+  useEffect(() => {
+    if (initialData !== undefined) {
+      setData(initialData);
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    transformRef.current = transformResponse;
+  }, [transformResponse]);
+
+  const defaultUnauthorizedHandler = useCallback(() => {
+    if (logout) {
+      logout();
+    }
+  }, [logout]);
+
+  const unauthorizedHandler = onUnauthorized || defaultUnauthorizedHandler;
+
+  const headersKey = useMemo(
+    () => (headersOption ? JSON.stringify(headersOption) : ''),
+    [headersOption]
+  );
+
+  const normalizedHeaders = useMemo(
+    () => (headersOption ? headersOption : EMPTY_OBJECT),
+    [headersKey]
+  );
+
+  const memoizedHeaders = useMemo(() => {
+    const resolvedHeaders = {
+      Accept: 'application/json',
+      ...normalizedHeaders,
+    };
+
+    if (body && !resolvedHeaders['Content-Type']) {
+      resolvedHeaders['Content-Type'] = 'application/json';
+    }
+
+    if (requiresAuth && auth && !resolvedHeaders.Authorization) {
+      resolvedHeaders.Authorization = `Bearer ${auth}`;
+    }
+
+    return resolvedHeaders;
+  }, [auth, body, headersKey, normalizedHeaders, requiresAuth]);
+
+  useEffect(() => {
+    if (!url || skip) {
+      setLoading(false);
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(url, {
+          method,
+          headers: memoizedHeaders,
+          body,
+          signal: abortController.signal,
+        });
+
+        if (response.status === 401) {
+          unauthorizedHandler?.();
+          setError('Unauthorized');
+          setLoading(false);
+          return;
         }
 
-        let abortController = new AbortController();
-        let signal = abortController.signal;
+        if (!response.ok) {
+          throw new Error(response.statusText || 'Something Went Wrong!');
+        }
 
-        setLoading(true);
-        // console.log('Fetching URL:', url);
-        
-        fetch(url, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': "Bearer " + localStorage.getItem('token')
-            },
-            signal
-        })
-            .then(res => {
-                // console.log('Response status:', res.status, 'for URL:', url);
-                if(res.status === 401){
-                    // Silently handle 401 errors - don't throw
-                    localStorage.removeItem('token');
-                    setLoading(false);
-                    return null;
-                }
-                if (!res.ok) {
-                    throw Error("Something Went Wrong!");
-                }
-                return res.json();
-            })
-            .then(data => {
-                // console.log('API Response for', url, ':', data);
-                if (data) {
-                    setData(data.data);
-                }
-                setLoading(false);
-            })
-            .catch(e => {
-                // console.error('API Error for', url, ':', e.message);
-                setError(e.message);
-                setLoading(false);
-            //   navigate('/');
-            });
+        const payload = await response.json();
+        const resolvedData = transformRef.current
+          ? transformRef.current(payload)
+          : payload?.data ?? payload;
 
-        // Cleanup function
-        return () => {
-            abortController.abort();
-        };
+        setData(resolvedData);
+        setLoading(false);
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return;
+        }
+        setError(err.message || 'Something Went Wrong!');
+        setLoading(false);
+      }
+    };
 
-    }, [url]);
+    fetchData();
 
-    return { data, loading, error };
-}
+    return () => {
+      abortController.abort();
+    };
+  }, [
+    url,
+    method,
+    body,
+    memoizedHeaders,
+    unauthorizedHandler,
+    skip,
+  ]);
+
+  return { data, loading, error };
+};
 
 export default useFetch;

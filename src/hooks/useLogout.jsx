@@ -5,7 +5,7 @@ import { message } from 'antd';
 import { AuthContext } from '../contexts/AuthContext';
 
 const useLogout = () => {
-    const { logout: contextLogout } = useContext(AuthContext);
+    const { auth, logout: contextLogout } = useContext(AuthContext);
     const [error, setError] = useState();
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -13,18 +13,22 @@ const useLogout = () => {
     const logout = async () => {
         setLoading(true);
         try {
+            if (!auth) {
+                contextLogout();
+                setLoading(false);
+                return;
+            }
             const response = await fetch(`${BASE_URL}/logout`, {
                 method: "POST",
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
-                    "Authorization": `Bearer ${localStorage.getItem('token')}`
+                    "Authorization": `Bearer ${auth}`
                 },
             });
             if (response.ok) {
                 setLoading(false);
                 contextLogout();
-                window.location.reload();
                 message.success('Logout successfully.');
             } else {
                 console.error("Logout failed:", response.statusText);

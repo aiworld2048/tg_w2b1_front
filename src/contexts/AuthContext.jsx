@@ -1,5 +1,13 @@
-import { createContext, useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router';
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useNavigate } from 'react-router-dom';
+import BASE_URL from '../hooks/baseUrl';
 
 const AuthContext = createContext({
   auth: null,
@@ -7,23 +15,132 @@ const AuthContext = createContext({
   updateProfile: () => {},
   logout: () => {},
   createGuestAccount: () => {},
+  authenticate: () => {},
+  refreshProfile: () => Promise.resolve(null),
 });
 
+const POLLING_INTERVAL = 15000;
+
 const AuthContextProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const navigate = useNavigate();
+  const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [profile, setProfile] = useState(() => {
     const savedProfile = localStorage.getItem('userProfile');
     return savedProfile ? JSON.parse(savedProfile) : null;
   });
-  const navigate = useNavigate();
+  const pollingRef = useRef(null);
 
-  const logout = () => {
+  const clearPollingTimer = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const updateProfile = useCallback((nextProfileOrUpdater) => {
+    setProfile((previousProfile) => {
+      const resolvedProfile =
+        typeof nextProfileOrUpdater === 'function'
+          ? nextProfileOrUpdater(previousProfile)
+          : nextProfileOrUpdater || null;
+
+      if (resolvedProfile) {
+        localStorage.setItem('userProfile', JSON.stringify(resolvedProfile));
+      } else {
+        localStorage.removeItem('userProfile');
+      }
+
+      return resolvedProfile;
+    });
+  }, []);
+
+  const logout = useCallback(() => {
+    clearPollingTimer();
     setToken(null);
     setProfile(null);
     localStorage.removeItem('token');
     localStorage.removeItem('userProfile');
-    navigate('/?type=all');
-  };
+    navigate('/?type=all', { replace: true });
+  }, [clearPollingTimer, navigate]);
+
+  const fetchProfile = useCallback(async (activeToken) => {
+    if (!activeToken) {
+      return null;
+    }
+
+    const response = await fetch(`${BASE_URL}/user`, {
+      headers: {
+        Authorization: `Bearer ${activeToken}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (response.status === 401) {
+      const error = new Error('Unauthorized');
+      error.code = 401;
+      throw error;
+    }
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch user profile');
+    }
+
+    const data = await response.json();
+    return data?.data ?? null;
+  }, []);
+
+  const refreshProfile = useCallback(
+    async (activeToken) => {
+      const tokenToUse = activeToken ?? token;
+      if (!tokenToUse) {
+        return null;
+      }
+
+      try {
+        const latestProfile = await fetchProfile(tokenToUse);
+        if (latestProfile) {
+          updateProfile((currentProfile) =>
+            currentProfile
+              ? { ...currentProfile, ...latestProfile }
+              : latestProfile
+          );
+        }
+        return latestProfile;
+      } catch (error) {
+        if (error.code === 401) {
+          logout();
+        } else {
+          console.error('Error refreshing profile:', error);
+        }
+        return null;
+      }
+    },
+    [token, fetchProfile, updateProfile, logout]
+  );
+
+  const authenticate = useCallback(
+    async (nextToken, profileData, options = {}) => {
+      if (!nextToken) {
+        logout();
+        return;
+      }
+
+      setToken(nextToken);
+
+      if (profileData) {
+        updateProfile(profileData);
+      } else if (!options.skipProfileFetch) {
+        await refreshProfile(nextToken);
+      }
+    },
+    [logout, refreshProfile, updateProfile]
+  );
+  const createGuestAccount = useCallback(
+    async (userData, guestToken) => {
+      await authenticate(guestToken, userData, { skipProfileFetch: true });
+    },
+    [authenticate]
+  );
 
   useEffect(() => {
     if (token) {
@@ -35,69 +152,23 @@ const AuthContextProvider = ({ children }) => {
   }, [token]);
 
   useEffect(() => {
-    if (token) {
-      const interval = setInterval(() => {
-        fetch('https://maxwinmyanmar.pro/api/user', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-        })
-          .then((res) => {
-            if (res.status === 401) {
-              logout();
-              return Promise.reject('Unauthorized');
-            }
-            if (!res.ok) {
-              return Promise.reject('Failed to fetch balance');
-            }
-            return res.json();
-          })
-          .then((data) => {
-            if (data && data.data) {
-              setProfile((currentProfile) => {
-                if (
-                  !currentProfile ||
-                  currentProfile.balance !== data.data.balance ||
-                  currentProfile.main_balance !== data.data.main_balance
-                ) {
-                  const updatedProfile = { ...currentProfile, ...data.data };
-                  localStorage.setItem(
-                    'userProfile',
-                    JSON.stringify(updatedProfile)
-                  );
-                  return updatedProfile;
-                }
-                return currentProfile;
-              });
-            }
-          })
-          .catch((error) => {
-            if (error !== 'Unauthorized') {
-              console.error('Error fetching real-time balance:', error);
-            }
-          });
-      }, 5000); // Fetch every 5 seconds
+    clearPollingTimer();
 
-      return () => clearInterval(interval);
+    if (!token) {
+      return undefined;
     }
-  }, [token]);
 
-  const updateProfile = (newProfile) => {
-    setProfile(newProfile);
-    if (newProfile) {
-      localStorage.setItem('userProfile', JSON.stringify(newProfile));
-    } else {
-      localStorage.removeItem('userProfile');
-    }
-  };
+    const run = () => {
+      refreshProfile();
+    };
 
-  const createGuestAccount = async (userData, token) => {
-    setToken(token);
-    setProfile(userData);
-    localStorage.setItem('token', token);
-    localStorage.setItem('userProfile', JSON.stringify(userData));
-  };
+    run();
+    pollingRef.current = setInterval(run, POLLING_INTERVAL);
+
+    return () => {
+      clearPollingTimer();
+    };
+  }, [token, refreshProfile, clearPollingTimer]);
 
   const value = useMemo(
     () => ({
@@ -106,8 +177,10 @@ const AuthContextProvider = ({ children }) => {
       updateProfile,
       logout,
       createGuestAccount,
+      authenticate,
+      refreshProfile,
     }),
-    [token, profile]
+    [token, profile, updateProfile, logout, createGuestAccount, authenticate, refreshProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

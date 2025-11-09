@@ -7,7 +7,7 @@ import { FaTrophy, FaCalendarAlt, FaClock, FaUsers, FaMoneyBillWave, FaStar } fr
 import { MdEmojiEvents, MdTrendingUp } from 'react-icons/md';
 
 const ThreeDWinner = () => {
-    const { auth, user } = useContext(AuthContext);
+    const { auth, user, logout } = useContext(AuthContext);
     const { content } = useContext(LanguageContext);
     const navigate = useNavigate();
     
@@ -24,7 +24,7 @@ const ThreeDWinner = () => {
         }
 
         fetchWinners();
-    }, [selectedDate, selectedSession]);
+    }, [auth, selectedDate, selectedSession]);
 
     const fetchWinners = async () => {
         setLoading(true);
@@ -41,13 +41,12 @@ const ThreeDWinner = () => {
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${auth}`
                 }
             });
 
             if (response.status === 401) {
-                localStorage.removeItem('token');
-                navigate('/login');
+                logout();
                 return;
             }
 

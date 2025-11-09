@@ -29,7 +29,7 @@ import SidebarLg from './SidebarLg';
 
 function NavBar() {
   const { content } = useContext(LanguageContext);
-  const { user, updateProfile } = useContext(AuthContext);
+  const { auth, user, updateProfile } = useContext(AuthContext);
   const [showRegister, setShowRegister] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const navigate = useNavigate();
@@ -95,7 +95,7 @@ function NavBar() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${auth}`,
         },
         body: JSON.stringify({ amount: Number(exchangeAmount) }),
       });
@@ -106,7 +106,7 @@ function NavBar() {
         // Fetch latest user profile
         const profileRes = await fetch(`${BASE_URL}/user`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${auth}`,
           },
         });
         const profileData = await profileRes.json();

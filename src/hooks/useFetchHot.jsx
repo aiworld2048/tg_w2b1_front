@@ -1,63 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import useFetch from './useFetch';
 
-const useFetchHot = (url) => {
-    let [data, setData] = useState([]);
-    let [loading, setLoading] = useState(false);
-    let [error, setError] = useState(null);
-    let navigate = useNavigate();
+const useFetchHot = (url) =>
+  useFetch(url, {
+    transformResponse: (payload) => payload,
+  });
 
-    useEffect(() => {
-        // Don't fetch if URL is null or undefined
-        if (!url) {
-            setLoading(false);
-            return;
-        }
-
-        let abortController = new AbortController();
-        let signal = abortController.signal;
-
-        setLoading(true);
-        fetch(url, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': "Bearer " + localStorage.getItem('token')
-            },
-            signal
-        })
-            .then(res => {
-                if(res.status === 401){
-                    // Silently handle 401 errors - don't throw
-                    localStorage.removeItem('token');
-                    setLoading(false);
-                    return null;
-                }
-                if (!res.ok) {
-                    throw Error("Something Went Wrong!");
-                }
-                return res.json();
-            })
-            .then(data => {
-                if (data) {
-                    setData(data);
-                }
-                setLoading(false);
-            })
-            .catch(e => {
-                setError(e.message);
-                setLoading(false);
-            });
-
-        // Cleanup function
-        return () => {
-            abortController.abort();
-        };
-
-    }, [url]);
-
-    return { data, loading, error };
-}
-
-export default useFetchHot; 
+export default useFetchHot;

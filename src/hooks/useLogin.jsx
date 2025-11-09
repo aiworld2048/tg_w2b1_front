@@ -5,7 +5,7 @@ import { message } from 'antd';
 import { AuthContext } from '../contexts/AuthContext';
 
 const useLogin = () => {
-    const { updateProfile } = useContext(AuthContext);
+    const { authenticate } = useContext(AuthContext);
     const [error, setError] = useState();
     const [errMsg, setErrMsg] = useState();
     const [loading, setLoading] = useState(false);
@@ -20,9 +20,7 @@ const useLogin = () => {
                 setErrMsg(null);
                 setLoading(false);
                 const { token, user } = res.data.data;
-                localStorage.setItem('token', token);
-                updateProfile(user);
-                window.location.reload();
+                await authenticate(token, user, { skipProfileFetch: true });
                 navigate('/?type=all');
                 message.success('Logged In Successfully.');
                 return user;
