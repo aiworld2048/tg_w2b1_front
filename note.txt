@@ -1,0 +1,6 @@
+flutter clean
+flutter pub get
+flutter build apk --release
+
+   setx JAVA_HOME "C:\Program Files\Java\jdk-17"
+   setx PATH "%JAVA_HOME%\bin;%PATH%"

@@ -7,6 +7,8 @@ const BuffaloGameRoom = ({ roomId, onBack }) => {
   const [gameUrl, setGameUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [gameLoadTimeout, setGameLoadTimeout] = useState(false);
+  const [useIframe, setUseIframe] = useState(false); // Option to use iframe instead of direct navigation
 
   const rooms = {
     1: { name: "African Buffalo", level: "Basic", minBet: 50, rtp: "96%", roomNumber: "(50)" },
@@ -48,7 +50,26 @@ const BuffaloGameRoom = ({ roomId, onBack }) => {
         
         if (data.code === 1) {
           // Use the URL from API response (exact provider format)
-          setGameUrl(data.Url || data.game_url);
+          const url = data.Url || data.game_url;
+          setGameUrl(url);
+          
+          // Buffalo games need direct navigation due to server connectivity requirements
+          // The game tries to connect to version check servers (rwer5mfk2.africanbuffalo.vip:23000)
+          // that may be blocked or refuse connections in iframes
+          // Default to direct navigation for better compatibility
+          if (!useIframe) {
+            setTimeout(() => {
+              if (url) {
+                console.log('Redirecting to direct play for better game compatibility...');
+                window.location.href = url;
+              }
+            }, 1000); // Small delay to show loading state, then redirect
+          }
+          
+          // Set timeout to detect if game is stuck loading in iframe
+          setTimeout(() => {
+            setGameLoadTimeout(true);
+          }, 5000);
         } else {
           setError(data.msg || "Failed to launch game");
         }
@@ -71,8 +92,11 @@ const BuffaloGameRoom = ({ roomId, onBack }) => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-yellow-400 mx-auto mb-4"></div>
           <h2 className="text-2xl font-bold text-yellow-400 mb-2">Loading Game Room...</h2>
-          <p className="text-gray-300">
+          <p className="text-gray-300 mb-4">
             Preparing {rooms[roomId]?.name} for you
+          </p>
+          <p className="text-gray-400 text-sm">
+            Redirecting to game...
           </p>
         </div>
       </div>
@@ -166,15 +190,17 @@ const BuffaloGameRoom = ({ roomId, onBack }) => {
         </div>
       </div>
 
-      {/* Full Screen Game Iframe */}
-      <div className="fixed inset-0 top-20 bg-black">
-        <iframe
+      {/* Full Screen Game Iframe or Direct Navigation */}
+      {useIframe ? (
+        <div className="fixed inset-0 top-20 bg-black">
+          <iframe
           src={gameUrl}
           className="w-full h-full border-0"
           title={`Buffalo Game Room ${roomId}`}
           allowFullScreen
           allow="autoplay; fullscreen; microphone; camera; payment; gamepad; accelerometer; gyroscope; web-share; cross-origin-isolated"
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-top-navigation-by-user-activation"
+          // Removed sandbox restrictions to allow game's network requests
+          // The game needs to make requests to version check servers
           loading="eager"
           referrerPolicy="no-referrer-when-downgrade"
           style={{ 
@@ -189,9 +215,22 @@ const BuffaloGameRoom = ({ roomId, onBack }) => {
           }}
           onLoad={() => {
             console.log('Buffalo game iframe loaded successfully');
+            // Check if game loaded properly after a delay
+            setTimeout(() => {
+              try {
+                const iframe = document.querySelector('iframe[title*="Buffalo Game Room"]');
+                if (iframe && iframe.contentWindow) {
+                  // Try to detect if game is stuck on loading
+                  console.log('Iframe content window accessible');
+                }
+              } catch (e) {
+                console.warn('Cannot access iframe content (cross-origin):', e);
+              }
+            }, 3000);
           }}
-          onError={() => {
-            console.log('Iframe failed to load - check VPN settings');
+          onError={(e) => {
+            console.error('Iframe failed to load:', e);
+            setError('Game failed to load. Please try opening in a new window or check your network connection.');
           }}
         />
         
@@ -207,41 +246,78 @@ const BuffaloGameRoom = ({ roomId, onBack }) => {
         </div>
         
         {/* VPN Warning & Fallback */}
-        <div className="absolute bottom-4 right-4 z-20">
-          <div className="bg-yellow-400/90 hover:bg-yellow-400 text-black px-4 py-3 rounded-lg text-sm font-bold transition-all duration-300 backdrop-blur-sm shadow-lg max-w-xs">
-            <div className="flex items-center space-x-2 mb-2">
-              <span>⚠️</span>
-              <span>Game not loading?</span>
+        {(gameLoadTimeout || error) && (
+          <div className="absolute bottom-4 right-4 z-20">
+            <div className="bg-yellow-400/90 hover:bg-yellow-400 text-black px-4 py-3 rounded-lg text-sm font-bold transition-all duration-300 backdrop-blur-sm shadow-lg max-w-xs">
+              <div className="flex items-center space-x-2 mb-2">
+                <span>⚠️</span>
+                <span>Game not loading?</span>
+              </div>
+              <p className="text-xs mb-2">
+                <strong>Tip:</strong> The game may need to connect to external servers. Buffalo games work better when opened directly.
+              </p>
+              <button
+                onClick={() => {
+                  if (gameUrl) {
+                    window.open(gameUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+                  }
+                }}
+                className="w-full bg-black/20 hover:bg-black/40 px-3 py-1 rounded text-xs font-bold transition-all duration-300 mb-2"
+              >
+                Open in New Window
+              </button>
+              <button
+                onClick={() => {
+                  if (gameUrl) {
+                    window.location.href = gameUrl;
+                  }
+                }}
+                className="w-full bg-green-500/80 hover:bg-green-500 px-3 py-1 rounded text-xs font-bold transition-all duration-300"
+              >
+                🎯 Direct Play (Recommended)
+              </button>
             </div>
-            <p className="text-xs mb-2">
-              <strong>Tip:</strong> Disable VPN for Buffalo games
-            </p>
-            <button
-              onClick={() => {
-                window.open(gameUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-              }}
-              className="w-full bg-black/20 hover:bg-black/40 px-3 py-1 rounded text-xs font-bold transition-all duration-300"
-            >
-              Open in New Window
-            </button>
           </div>
-        </div>
+        )}
         
         {/* Direct Play Option */}
         <div className="absolute bottom-4 left-4 z-20">
           <button
             onClick={() => {
               // Direct redirect to game URL (exact provider format)
-              window.location.href = gameUrl;
+              // This bypasses iframe restrictions and allows full game functionality
+              if (gameUrl) {
+                window.location.href = gameUrl;
+              }
             }}
             className="bg-green-500/80 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 backdrop-blur-sm shadow-lg"
-            title="Open game directly (bypass iframe)"
+            title="Open game directly (bypass iframe - recommended if game is not loading)"
           >
             🎯 Direct Play
           </button>
         </div>
-      </div>
-
+        </div>
+      ) : (
+        // If not using iframe, show a message while redirecting
+        <div className="fixed inset-0 top-20 bg-black flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-400 mx-auto mb-4"></div>
+            <h2 className="text-xl font-bold text-yellow-400 mb-2">Opening Game...</h2>
+            <p className="text-gray-300 text-sm mb-4">
+              Redirecting to {rooms[roomId]?.name}...
+            </p>
+            <button
+              onClick={() => {
+                setUseIframe(true);
+                setGameLoadTimeout(false);
+              }}
+              className="text-gray-400 hover:text-gray-200 text-xs underline"
+            >
+              Use iframe instead
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
